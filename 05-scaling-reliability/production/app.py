@@ -30,20 +30,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 from utils.mock_llm import ask
+import redis
 
-# ── Redis (optional — fallback to in-memory dict nếu không có Redis)
-try:
-    import redis
-    REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-    _redis = redis.from_url(REDIS_URL, decode_responses=True)
-    _redis.ping()
-    USE_REDIS = True
-    print("✅ Connected to Redis")
-except Exception:
-    USE_REDIS = False
-    _memory_store: dict = {}
-    print("⚠️  Redis not available — using in-memory store (not scalable!)")
-
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+_redis = redis.from_url(REDIS_URL, decode_responses=True)
+_redis.ping()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -55,24 +46,13 @@ INSTANCE_ID = os.getenv("INSTANCE_ID", f"instance-{uuid.uuid4().hex[:6]}")
 # ──────────────────────────────────────────────────────────
 # Session Storage (Redis-backed, Stateless-compatible)
 # ──────────────────────────────────────────────────────────
-
 def save_session(session_id: str, data: dict, ttl_seconds: int = 3600):
-    """Lưu session vào Redis với TTL."""
     serialized = json.dumps(data)
-    if USE_REDIS:
-        _redis.setex(f"session:{session_id}", ttl_seconds, serialized)
-    else:
-        _memory_store[f"session:{session_id}"] = data
-
+    _redis.setex(f"session:{session_id}", ttl_seconds, serialized)
 
 def load_session(session_id: str) -> dict:
-    """Load session từ Redis."""
-    if USE_REDIS:
-        data = _redis.get(f"session:{session_id}")
-        return json.loads(data) if data else {}
-    return _memory_store.get(f"session:{session_id}", {})
-
-
+    data = _redis.get(f"session:{session_id}")
+    return json.loads(data) if data else {}
 def append_to_history(session_id: str, role: str, content: str):
     """Thêm message vào conversation history."""
     session = load_session(session_id)
@@ -93,7 +73,7 @@ def append_to_history(session_id: str, role: str, content: str):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(f"Starting instance {INSTANCE_ID}")
-    logger.info(f"Storage: {'Redis ✅' if USE_REDIS else 'In-memory ⚠️'}")
+    logger.info("Storage: Redis ✅")
     yield
     logger.info(f"Instance {INSTANCE_ID} shutting down")
 
@@ -153,7 +133,7 @@ async def chat(body: ChatRequest):
         "answer": answer,
         "turn": len([m for m in history if m["role"] == "user"]) + 1,
         "served_by": INSTANCE_ID,  # ← thấy rõ bất kỳ instance nào cũng serve được
-        "storage": "redis" if USE_REDIS else "in-memory",
+        "storage": "redis",
     }
 
 
@@ -172,48 +152,34 @@ def get_history(session_id: str):
 
 @app.delete("/chat/{session_id}")
 def delete_session(session_id: str):
-    """Xóa session (user logout)."""
-    if USE_REDIS:
-        _redis.delete(f"session:{session_id}")
-    else:
-        _memory_store.pop(f"session:{session_id}", None)
+    _redis.delete(f"session:{session_id}")
     return {"deleted": session_id}
-
 
 # ──────────────────────────────────────────────────────────
 # Health / Metrics
 # ──────────────────────────────────────────────────────────
-
 @app.get("/health")
 def health():
-    redis_ok = False
-    if USE_REDIS:
-        try:
-            _redis.ping()
-            redis_ok = True
-        except Exception:
-            redis_ok = False
-
-    status = "ok" if (not USE_REDIS or redis_ok) else "degraded"
+    try:
+        _redis.ping()
+        redis_ok = True
+    except Exception:
+        redis_ok = False
 
     return {
-        "status": status,
+        "status": "ok" if redis_ok else "degraded",
         "instance_id": INSTANCE_ID,
         "uptime_seconds": round(time.time() - START_TIME, 1),
-        "storage": "redis" if USE_REDIS else "in-memory",
-        "redis_connected": redis_ok if USE_REDIS else "N/A",
+        "storage": "redis",
+        "redis_connected": redis_ok,
     }
-
-
 @app.get("/ready")
 def ready():
-    if USE_REDIS:
-        try:
-            _redis.ping()
-        except Exception:
-            raise HTTPException(503, "Redis not available")
+    try:
+        _redis.ping()
+    except Exception:
+        raise HTTPException(503, "Redis not available")
     return {"ready": True, "instance": INSTANCE_ID}
-
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))

@@ -24,8 +24,9 @@ import signal
 import logging
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
-
-
+import redis
+import sqlite3
+from fastapi.responses import JSONResponse
 from fastapi import FastAPI, HTTPException
 import uvicorn
 from utils.mock_llm import ask
@@ -37,6 +38,12 @@ START_TIME = time.time()
 _is_ready = False
 _in_flight_requests = 0  # đếm số request đang xử lý
 
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
+
+DB_PATH = os.getenv("DB_PATH", "app.db")
+db = sqlite3.connect(DB_PATH, check_same_thread=False)
+_shutting_down = False
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -52,10 +59,11 @@ async def lifespan(app: FastAPI):
     yield
 
     # ── Shutdown ──
+    global _shutting_down
     _is_ready = False
+    _shutting_down = True
     logger.info("🔄 Graceful shutdown initiated...")
 
-    # Chờ request đang xử lý hoàn thành (tối đa 30 giây)
     timeout = 30
     elapsed = 0
     while _in_flight_requests > 0 and elapsed < timeout:
@@ -66,13 +74,16 @@ async def lifespan(app: FastAPI):
     logger.info("✅ Shutdown complete")
 
 
-app = FastAPI(title="Agent — Health Check Demo", lifespan=lifespan)
 
+app = FastAPI(title="Agent — Health Check Demo", lifespan=lifespan)
 
 @app.middleware("http")
 async def track_requests(request, call_next):
-    """Theo dõi số request đang xử lý."""
     global _in_flight_requests
+
+    if _shutting_down and request.url.path not in ["/health"]:
+        raise HTTPException(status_code=503, detail="Server is shutting down")
+
     _in_flight_requests += 1
     try:
         response = await call_next(request)
@@ -100,72 +111,37 @@ async def ask_agent(question: str):
 # ──────────────────────────────────────────────────────────
 # HEALTH CHECKS — Phần quan trọng nhất của file này
 # ──────────────────────────────────────────────────────────
-
 @app.get("/health")
 def health():
-    """
-    LIVENESS PROBE — "Agent có còn sống không?"
-
-    Cloud platform (Railway, Render, K8s) gọi endpoint này định kỳ.
-    Nếu trả về non-200 hoặc timeout → platform restart container.
-
-    Nên trả về:
-    - status: "ok" hoặc "degraded"
-    - uptime: seconds
-    - version: để biết đang chạy version nào
-    """
-    uptime = round(time.time() - START_TIME, 1)
-
-    # Kiểm tra dependencies quan trọng
-    checks = {}
-
-    # Check memory (ví dụ đơn giản)
-    try:
-        import psutil
-        mem = psutil.virtual_memory()
-        checks["memory"] = {
-            "status": "ok" if mem.percent < 90 else "degraded",
-            "used_percent": mem.percent,
-        }
-    except ImportError:
-        checks["memory"] = {"status": "ok", "note": "psutil not installed"}
-
-    overall_status = "ok" if all(
-        v.get("status") == "ok" for v in checks.values()
-    ) else "degraded"
-
     return {
-        "status": overall_status,
-        "uptime_seconds": uptime,
-        "version": "1.0.0",
-        "environment": os.getenv("ENVIRONMENT", "development"),
+        "status": "ok",
+        "uptime_seconds": round(time.time() - START_TIME, 1),
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "checks": checks,
     }
-
 
 @app.get("/ready")
 def ready():
-    """
-    READINESS PROBE — "Agent có sẵn sàng nhận request chưa?"
-
-    Load balancer dùng endpoint này để quyết định có route
-    traffic vào instance này không.
-
-    Trả về 503 khi:
-    - Đang khởi động (model chưa load xong)
-    - Đang shutdown
-    - Database/dependencies chưa connect
-    """
     if not _is_ready:
-        raise HTTPException(
+        return JSONResponse(
             status_code=503,
-            detail="Agent not ready. Check back in a few seconds.",
+            content={"status": "not ready", "reason": "app is starting or shutting down"},
         )
-    return {
-        "ready": True,
-        "in_flight_requests": _in_flight_requests,
-    }
+
+    try:
+        redis_client.ping()
+        db.execute("SELECT 1")
+        return {
+            "status": "ready",
+            "in_flight_requests": _in_flight_requests,
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "not ready",
+                "error": str(e),
+            },
+        )
 
 
 # ──────────────────────────────────────────────────────────
@@ -173,14 +149,8 @@ def ready():
 # ──────────────────────────────────────────────────────────
 
 def handle_sigterm(signum, frame):
-    """
-    SIGTERM là signal platform gửi khi muốn dừng container.
-    Khác với SIGKILL (không thể catch được).
-
-    uvicorn bắt SIGTERM tự động và gọi lifespan shutdown.
-    Hàm này để log thêm thông tin.
-    """
-    logger.info(f"Received signal {signum} — uvicorn will handle graceful shutdown")
+    signal_name = "SIGTERM" if signum == signal.SIGTERM else "SIGINT"
+    logger.info(f"Received {signal_name} — starting graceful shutdown")
 
 
 signal.signal(signal.SIGTERM, handle_sigterm)

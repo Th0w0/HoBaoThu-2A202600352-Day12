@@ -15,15 +15,16 @@ class Settings:
     # App
     app_name: str = field(default_factory=lambda: os.getenv("APP_NAME", "Production AI Agent"))
     app_version: str = field(default_factory=lambda: os.getenv("APP_VERSION", "1.0.0"))
+    log_level: str = field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
 
     # LLM
     openai_api_key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
     llm_model: str = field(default_factory=lambda: os.getenv("LLM_MODEL", "gpt-4o-mini"))
 
     # Security
-    agent_api_key: str = field(default_factory=lambda: os.getenv("AGENT_API_KEY", "dev-key-change-me"))
-    jwt_secret: str = field(default_factory=lambda: os.getenv("JWT_SECRET", "dev-jwt-secret"))
-    allowed_origins: list = field(
+    agent_api_key: str = field(default_factory=lambda: os.getenv("AGENT_API_KEY", ""))
+    jwt_secret: str = field(default_factory=lambda: os.getenv("JWT_SECRET", ""))
+    allowed_origins: list[str] = field(
         default_factory=lambda: os.getenv("ALLOWED_ORIGINS", "*").split(",")
     )
 
@@ -33,22 +34,29 @@ class Settings:
     )
 
     # Budget
-    daily_budget_usd: float = field(
-        default_factory=lambda: float(os.getenv("DAILY_BUDGET_USD", "5.0"))
+    monthly_budget_usd: float = field(
+        default_factory=lambda: float(os.getenv("MONTHLY_BUDGET_USD", "5.0"))
     )
 
     # Storage
-    redis_url: str = field(default_factory=lambda: os.getenv("REDIS_URL", ""))
+    redis_url: str = field(
+        default_factory=lambda: os.getenv("REDIS_URL", "redis://redis:6379/0")
+    )
 
     def validate(self):
         logger = logging.getLogger(__name__)
+
         if self.environment == "production":
-            if self.agent_api_key == "dev-key-change-me":
+            if not self.agent_api_key:
                 raise ValueError("AGENT_API_KEY must be set in production!")
-            if self.jwt_secret == "dev-jwt-secret":
+            if not self.jwt_secret:
                 raise ValueError("JWT_SECRET must be set in production!")
+            if not self.redis_url:
+                raise ValueError("REDIS_URL must be set in production!")
+
         if not self.openai_api_key:
             logger.warning("OPENAI_API_KEY not set — using mock LLM")
+
         return self
 
 
