@@ -11,8 +11,8 @@ services:
     runtime: python
     region: singapore
     plan: free
-    buildCommand: cd assignments/HoBaoThu-2A202600352-Day12/03-cloud-deployment/render && pip install -r requirements.txt
-    startCommand: cd assignments/HoBaoThu-2A202600352-Day12/03-cloud-deployment/render && uvicorn app:app --host 0.0.0.0 --port $PORT
+    buildCommand: cd 03-cloud-deployment/render && pip install -r requirements.txt
+    startCommand: cd 03-cloud-deployment/render && uvicorn app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     autoDeploy: true
     envVars:
