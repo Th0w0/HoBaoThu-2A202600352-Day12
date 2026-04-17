@@ -98,7 +98,7 @@ Ngược lại, `render.yaml` chi tiết hơn vì nó mô tả hạ tầng theo 
 Nói ngắn gọn, `railway.toml` thiên về cấu hình deploy cho một ứng dụng trên Railway, còn `render.yaml` thiên về mô tả toàn bộ service stack trên Render.
 ## Part 4: API Security
 
-### Exercise 4.1-4.3: Test results
+### Exercise 4.1:
 - API key được check ở đâu?
 API key được kiểm tra trong endpoint `/ask` thông qua header `X-API-Key`.
 
@@ -125,9 +125,21 @@ question answer
 -------- ------
 Hello    Đây là câu trả lời từ AI agent (mock). Trong production, đây sẽ là response từ OpenAI...
 ```
+### Exercise 4.2:
+
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzdHVkZW50Iiwicm9sZSI6InVzZXIiLCJpYXQiOjE3NzY0MzgwMzEsImV4cC...",
+  "token_type": "bearer"
+}
+
+### Exercise 4.3: Rate limiting
+
+1. **Algorithm:** Sliding Window Counter. :contentReference[oaicite:3]{index=3}  
+2. **Limit:** User = 10 requests/minute, Admin = 100 requests/minute. :contentReference[oaicite:4]{index=4}  
+3. **Admin bypass:** Không bypass hoàn toàn; admin dùng `rate_limiter_admin` với limit cao hơn. :contentReference[oaicite:5]{index=5}
 
 ### Exercise 4.4: Cost guard implementation
-[Explain your approach]
+Implement cost guard bằng Redis để lưu và theo dõi usage của từng user theo ngày thay vì dùng in-memory. Hệ thống kiểm tra budget của user và budget toàn cục trước mỗi request, chặn khi vượt giới hạn, rồi cập nhật số token và chi phí sau khi xử lý xong. :contentReference[oaicite:0]{index=0}
 
 ## Part 5: Scaling & Reliability
 

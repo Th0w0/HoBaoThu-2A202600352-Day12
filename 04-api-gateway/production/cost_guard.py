@@ -12,6 +12,8 @@ import time
 import logging
 from dataclasses import dataclass, field
 from fastapi import HTTPException
+import os
+import redis
 
 logger = logging.getLogger(__name__)
 
@@ -46,16 +48,42 @@ class CostGuard:
         self.daily_budget_usd = daily_budget_usd
         self.global_daily_budget_usd = global_daily_budget_usd
         self.warn_at_pct = warn_at_pct
-        self._records: dict[str, UsageRecord] = {}
+        # self._records: dict[str, UsageRecord] = {}
+        # self._global_today = time.strftime("%Y-%m-%d")
+        # self._global_cost = 0.0
+        self.redis = redis.Redis.from_url(
+            os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+            decode_responses=True,
+        )
         self._global_today = time.strftime("%Y-%m-%d")
-        self._global_cost = 0.0
 
     def _get_record(self, user_id: str) -> UsageRecord:
         today = time.strftime("%Y-%m-%d")
-        record = self._records.get(user_id)
-        if not record or record.day != today:
-            self._records[user_id] = UsageRecord(user_id=user_id, day=today)
-        return self._records[user_id]
+        key = f"cost_guard:{user_id}:{today}"
+        data = self.redis.hgetall(key)
+
+        if not data:
+            record = UsageRecord(user_id=user_id, day=today)
+            self.redis.hset(
+                key,
+                mapping={
+                    "user_id": record.user_id,
+                    "input_tokens": record.input_tokens,
+                    "output_tokens": record.output_tokens,
+                    "request_count": record.request_count,
+                    "day": record.day,
+                },
+            )
+            self.redis.expire(key, 2 * 24 * 3600)
+            return record
+
+        return UsageRecord(
+            user_id=data["user_id"],
+            input_tokens=int(data["input_tokens"]),
+            output_tokens=int(data["output_tokens"]),
+            request_count=int(data["request_count"]),
+            day=data["day"],
+        )
 
     def check_budget(self, user_id: str) -> None:
         """
@@ -65,8 +93,12 @@ class CostGuard:
         record = self._get_record(user_id)
 
         # Global budget check
-        if self._global_cost >= self.global_daily_budget_usd:
-            logger.critical(f"GLOBAL BUDGET EXCEEDED: ${self._global_cost:.4f}")
+        today = time.strftime("%Y-%m-%d")
+        global_key = f"cost_guard:global:{today}"
+        global_cost = float(self.redis.get(global_key) or 0.0)
+
+        if global_cost >= self.global_daily_budget_usd:
+            logger.critical(f"GLOBAL BUDGET EXCEEDED: ${global_cost:.4f}")
             raise HTTPException(
                 status_code=503,
                 detail="Service temporarily unavailable due to budget limits. Try again tomorrow.",
@@ -99,9 +131,28 @@ class CostGuard:
         record.output_tokens += output_tokens
         record.request_count += 1
 
-        cost = (input_tokens / 1000 * PRICE_PER_1K_INPUT_TOKENS +
-                output_tokens / 1000 * PRICE_PER_1K_OUTPUT_TOKENS)
-        self._global_cost += cost
+        today = time.strftime("%Y-%m-%d")
+        user_key = f"cost_guard:{user_id}:{today}"
+        self.redis.hset(
+            user_key,
+            mapping={
+                "user_id": record.user_id,
+                "input_tokens": record.input_tokens,
+                "output_tokens": record.output_tokens,
+                "request_count": record.request_count,
+                "day": record.day,
+            },
+        )
+        self.redis.expire(user_key, 2 * 24 * 3600)
+
+        cost = (
+            input_tokens / 1000 * PRICE_PER_1K_INPUT_TOKENS
+            + output_tokens / 1000 * PRICE_PER_1K_OUTPUT_TOKENS
+        )
+
+        global_key = f"cost_guard:global:{today}"
+        self.redis.incrbyfloat(global_key, cost)
+        self.redis.expire(global_key, 2 * 24 * 3600)
 
         logger.info(
             f"Usage: user={user_id} req={record.request_count} "
