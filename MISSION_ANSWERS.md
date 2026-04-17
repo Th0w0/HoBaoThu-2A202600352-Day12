@@ -64,7 +64,6 @@ Image nhỏ hơn:
 Không chứa build tools và file tạm nên giảm kích thước đáng kể. Multi-stage build giúp tách biệt môi trường build và runtime, từ đó tối ưu image cho production.
 
 ### Exercise 2.4: Docker Compose stack
-```markdown
 ```mermaid
 flowchart TD
     C[Client] -->|HTTP 80 / HTTPS 443| N[Nginx - Reverse Proxy]
