@@ -1,24 +1,36 @@
 import time
 import redis
-from fastapi import HTTPException, Request
-from config import settings
+from fastapi import HTTPException
+import os
 
-redis_client = redis.Redis.from_url(settings.redis_url, decode_responses=True)
+redis_client = redis.Redis.from_url(
+    os.getenv("REDIS_URL", "redis://redis:6379/0"),
+    decode_responses=True
+)
 
-def check_rate_limit(request: Request):
+
+def check_rate_limit(user_id: str, limit: int = 10):
     try:
-        body = {}
-        # dependency sync không đọc body tiện được, nên có thể limit theo client IP hoặc API key
-        api_key = request.headers.get("X-API-Key", "anonymous")
-        bucket = f"rate_limit:{api_key[:8]}:{int(time.time() // 60)}"
+        bucket = f"rate_limit:{user_id}:{int(time.time() // 60)}"
 
         count = redis_client.incr(bucket)
+
         if count == 1:
             redis_client.expire(bucket, 60)
 
-        if count > settings.rate_limit_per_minute:
-            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+        if count > limit:
+            raise HTTPException(
+                status_code=429,
+                detail="Rate limit exceeded",
+                headers={"Retry-After": "60"},
+            )
+
+        return {
+            "limit": limit,
+            "remaining": max(0, limit - count)
+        }
+
     except HTTPException:
         raise
-    except Exception:
+    except redis.RedisError:
         raise HTTPException(status_code=503, detail="Rate limiter unavailable")
