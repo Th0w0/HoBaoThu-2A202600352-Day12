@@ -65,7 +65,9 @@ Không chứa build tools và file tạm nên giảm kích thước đáng kể.
 
 ### Exercise 2.4: Docker Compose stack
 **Flow:**
-Client → Nginx (port 80) → Agent (port 8000) → Redis (port 6379), Qdrant (port 6333)
+```
+Client → Nginx (port 80) → Agent (port 8000) → Redis (port 6379)
+```
 
 The system starts four services: nginx, agent, redis, and qdrant.
 
@@ -81,9 +83,19 @@ This architecture separates concerns and allows the system to scale, since multi
 ## Part 3: Cloud Deployment
 
 ### Exercise 3.1: Railway deployment
-- URL: https://your-app.railway.app
-- Screenshot: [Link to screenshot in repo]
+- URL: https://vinuni-production-4964.up.railway.app/
+- Screenshot: HoBaoThu-2A202600352-Day12\deploy.png
 
+### Exercise 3.2: Render deployment
+### So sánh `render.yaml` và `railway.toml`
+
+`render.yaml` và `railway.toml` đều là file cấu hình deployment, nhưng chúng khác nhau ở mức độ chi tiết và cách quản lý hạ tầng.
+
+`railway.toml` chủ yếu tập trung vào cách build và deploy một service. File này ngắn gọn hơn, chỉ định builder, start command, health check, và restart policy. Nó phù hợp khi chỉ cần cấu hình một app để chạy trên Railway.
+
+Ngược lại, `render.yaml` chi tiết hơn vì nó mô tả hạ tầng theo kiểu Infrastructure as Code. Ngoài build command, start command, và health check, file này còn khai báo thêm tên service, runtime, region, plan, auto deploy, và environment variables. Nó cũng có thể mở rộng để định nghĩa thêm các service khác như Redis.
+
+Nói ngắn gọn, `railway.toml` thiên về cấu hình deploy cho một ứng dụng trên Railway, còn `render.yaml` thiên về mô tả toàn bộ service stack trên Render.
 ## Part 4: API Security
 
 ### Exercise 4.1-4.3: Test results
