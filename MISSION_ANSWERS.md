@@ -77,6 +77,7 @@ flowchart TD
         R
         Q
     end
+```
 
 The system starts four services: nginx, agent, redis, and qdrant.
 
