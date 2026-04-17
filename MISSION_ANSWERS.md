@@ -64,16 +64,19 @@ Image nhỏ hơn:
 Không chứa build tools và file tạm nên giảm kích thước đáng kể. Multi-stage build giúp tách biệt môi trường build và runtime, từ đó tối ưu image cho production.
 
 ### Exercise 2.4: Docker Compose stack
-Client
-  |
-  v
-Nginx (Reverse Proxy)
-  |
-  v
-Agent (FastAPI)
-  |        \
-  v         v
-Redis     Qdrant
+```mermaid
+flowchart TD
+    C[Client] -->|HTTP :80 / HTTPS :443| N[Nginx<br/>Reverse Proxy]
+    N --> A[Agent<br/>FastAPI]
+    A --> R[Redis]
+    A --> Q[Qdrant]
+
+    subgraph Internal Docker Network
+        N
+        A
+        R
+        Q
+    end
 
 
 The system starts four services: nginx, agent, redis, and qdrant.
