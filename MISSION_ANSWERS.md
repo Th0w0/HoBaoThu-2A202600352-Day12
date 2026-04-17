@@ -149,7 +149,6 @@ Health check được implement với endpoint `/health` để kiểm tra livene
 Implement signal handler để bắt SIGINT/SIGTERM và kích hoạt graceful shutdown thay vì tắt đột ngột. Khi nhận tín hiệu, ứng dụng chuyển sang trạng thái không sẵn sàng, chờ các request đang xử lý hoàn thành rồi mới shutdown an toàn.
 ### Exercise 5.3: Stateless design
 Refactor agent sang stateless bằng cách đưa session và conversation history ra Redis thay vì lưu trong memory của từng instance. Nhờ đó, mọi instance đều có thể đọc cùng một state và tiếp tục cuộc hội thoại mà không phụ thuộc vào local process memory.
-### Exercise 5.4: Load balancing
-### Exercise 5.5: Test stateless
+
 
 ```
