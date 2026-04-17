@@ -5,6 +5,16 @@
 > **Date:** _________________________
 
 ---
+
+##  Submission Requirements
+
+Submit a **GitHub repository** containing:
+
+### 1. Mission Answers (40 points)
+
+Create a file `MISSION_ANSWERS.md` with your answers to all exercises:
+
+```markdown
 # Day 12 Lab - Mission Answers
 
 ## Part 1: Localhost vs Production
@@ -32,28 +42,6 @@
 - Production: [Y] MB
 - Difference: [Z]%
 
-### Exercise 2.4: Docker Compose stack
-Client
-  |
-  v
-Nginx (Reverse Proxy)
-  |
-  v
-Agent (FastAPI)
-  |        \
-  v         v
-Redis     Qdrant
-
-
-The system starts four services: nginx, agent, redis, and qdrant.
-
-Nginx acts as the entry point and reverse proxy, exposing port 80 to the outside. All client requests are first sent to nginx, which then forwards them to the agent service.
-
-The agent service handles the main application logic. It communicates with Redis for session storage and rate limiting, and with Qdrant as a vector database for retrieval (RAG).
-
-Redis and Qdrant are not exposed externally and only communicate with the agent through an internal network.
-
-This architecture separates concerns and allows the system to scale, since multiple agent instances can be added behind nginx.
 ## Part 3: Cloud Deployment
 
 ### Exercise 3.1: Railway deployment
