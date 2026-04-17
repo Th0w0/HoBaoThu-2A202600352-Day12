@@ -5,16 +5,6 @@
 > **Date:** _________________________
 
 ---
-
-##  Submission Requirements
-
-Submit a **GitHub repository** containing:
-
-### 1. Mission Answers (40 points)
-
-Create a file `MISSION_ANSWERS.md` with your answers to all exercises:
-
-```markdown
 # Day 12 Lab - Mission Answers
 
 ## Part 1: Localhost vs Production
