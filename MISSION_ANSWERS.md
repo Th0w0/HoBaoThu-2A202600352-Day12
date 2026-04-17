@@ -108,9 +108,24 @@ Nếu API key sai hoặc không có, server sẽ trả về lỗi unauthorized v
 - Làm sao rotate key?
 Có thể rotate key bằng cách thay đổi giá trị API key trong config hoặc environment variable và restart service.
 
-'''
-(base) PS C:\Users\Th0w0\Desktop\Folder\code\vinuni> Invoke-RestMethod -Uri "http://localhost:8000/ask?question=Hello" -Method POST Invoke-RestMethod : {"detail":"Missing API key. Include header: X-API-Key: "} At line:1 char:1 + Invoke-RestMethod -Uri "http://localhost:8000/ask?question=Hello" -Me ... + ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ + CategoryInfo : InvalidOperation: (System.Net.HttpWebRequest:HttpWebRequest) [Invoke-RestMethod ], WebException + FullyQualifiedErrorId : WebCmdletWebResponseException,Microsoft.PowerShell.Commands.InvokeRestMethodCom mand (base) PS C:\Users\Th0w0\Desktop\Folder\code\vinuni> Invoke-RestMethod -Uri "http://localhost:8000/ask?question=Hello" >> -Method POST >> -Headers @{"X-API-Key"="demo-key-change-in-production"} question answer -------- ------ Hello ÄÃ¢y lÃ cÃ¢u tráº£ lá»i tá»« AI agent (mock). Trong production, ÄÃ¢y sáº½ lÃ response tá»« Op... (base) PS C:\Users\Th0w0\Desktop\Folder\code\vinuni>
-'''
+```powershell
+(base) PS C:\Users\Th0w0\Desktop\Folder\code\vinuni> Invoke-RestMethod -Uri "http://localhost:8000/ask?question=Hello" -Method POST
+Invoke-RestMethod : {"detail":"Missing API key. Include header: X-API-Key: "}
+At line:1 char:1
++ Invoke-RestMethod -Uri "http://localhost:8000/ask?question=Hello" -Me ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++ CategoryInfo          : InvalidOperation: (System.Net.HttpWebRequest:HttpWebRequest) [Invoke-RestMethod ], WebException
++ FullyQualifiedErrorId : WebCmdletWebResponseException,Microsoft.PowerShell.Commands.InvokeRestMethodCommand
+
+(base) PS C:\Users\Th0w0\Desktop\Folder\code\vinuni> Invoke-RestMethod -Uri "http://localhost:8000/ask?question=Hello" `
+  -Method POST `
+  -Headers @{"X-API-Key"="demo-key-change-in-production"}
+
+question answer
+-------- ------
+Hello    Đây là câu trả lời từ AI agent (mock). Trong production, đây sẽ là response từ OpenAI...
+```
+
 ### Exercise 4.4: Cost guard implementation
 [Explain your approach]
 
